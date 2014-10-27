@@ -39,6 +39,9 @@
       ignoresPersistentStateOnLaunch = "NO"
       debugDocumentVersioning = "YES"
       allowLocationSimulation = "YES">
+      <PathRunnable
+         FilePath = "/Users/mac/Downloads/mazewar-starter-code/xMake/test/mazewar">
+      </PathRunnable>
       <AdditionalOptions>
       </AdditionalOptions>
    </LaunchAction>
