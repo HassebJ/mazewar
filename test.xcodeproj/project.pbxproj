@@ -41,7 +41,7 @@
 		04D6C88019FEC584008596F2 /* Makefile */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.make; path = Makefile; sourceTree = "<group>"; };
 		04D6C88119FEC584008596F2 /* mazewar.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = mazewar.h; sourceTree = "<group>"; };
 		04D6C88219FEC584008596F2 /* Nominal.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Nominal.h; sourceTree = "<group>"; };
-		04D6C88319FEC584008596F2 /* toplevel.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = toplevel.cpp; sourceTree = "<group>"; };
+		04D6C88319FEC584008596F2 /* toplevel.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = toplevel.cpp; sourceTree = "<group>"; xcLanguageSpecificationIdentifier = xcode.lang.cpp; };
 		04D6C88419FEC584008596F2 /* winsys.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = winsys.cpp; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 

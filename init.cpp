@@ -196,10 +196,9 @@ getHostName(char *prompt, char **hostName, Sockaddr *hostAddr)
 {
 	char		buf[128];
 	Sockaddr	*AddrTemp;
-
 	buf[0] = '\0';
 	for (AddrTemp = (Sockaddr *)NULL; AddrTemp == (Sockaddr *)NULL; )
-	  {
+    {
 		printf("%s %s: " , prompt, "(CR for any host)");
 		fgets(buf, sizeof(buf)-1, stdin);
 		if (strlen(buf) == 0)
@@ -208,7 +207,6 @@ getHostName(char *prompt, char **hostName, Sockaddr *hostAddr)
 		if (*hostName == NULL)
 			MWError("no mem for hostName");
 		strcpy(*hostName, buf);
-
 		/* check for valid maze name */
 		AddrTemp = resolveHost(*hostName);
 		if (AddrTemp== (Sockaddr *) NULL) {

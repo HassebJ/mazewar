@@ -42,6 +42,7 @@ int main(int argc, char *argv[])
     MazeInit(argc, argv);
 
     NewPosition(M);
+    
 
     /* So you can see what a Rat is supposed to look like, we create
     one rat in the single player mode Mazewar.
@@ -101,7 +102,7 @@ play(void)
 				break;
                        
             case EVENT_TIMEOUT:
-               // manageMissiles();
+                manageMissiles();
                 break;
 
 			case EVENT_INT:
@@ -123,7 +124,7 @@ play(void)
 
 		ratStates();		/* clean house */
 
-		manageMissiles();
+//		manageMissiles();
 
 		DoViewUpdate();
 
@@ -325,6 +326,11 @@ void shoot()
 	if(rockets[0]->visible == true){
 		showMissile(rockets[0]->xloc(), rockets[0]->yloc(), rockets[0]->getdir(), MY_X_LOC, MY_X_LOC, FALSE);
 	}
+    else{
+        delete rockets[0];
+    }
+    
+    updateView = TRUE;
 	
 	// cout << MY_X_LOC << MY_Y_LOC << endl;
 }
@@ -394,6 +400,7 @@ void MWError(char *s)
 /* This is just for the sample version, rewrite your own */
 Score GetRatScore(RatIndexType ratId)
 {
+    cout << ratId.value() <<" "<< 	M->myRatId().value()<<endl;
   if (ratId.value() == 	M->myRatId().value())
     { return(M->score()); }
   else { return (0); }
@@ -451,13 +458,14 @@ void manageMissiles()
 			showMissile(rockets[0]->xloc(), rockets[0]->yloc(), rockets[0]->getdir(), ox, oy, TRUE);
 			
 
-			updateView = TRUE;
+			
 		}
 		else{
-			clearSquare(rockets[0]->xloc(), rockets[0]->yloc());
+			delete rockets[0];
 		}
 
 	}
+    updateView = TRUE;
 
   
 }
@@ -489,6 +497,19 @@ void DoViewUpdate()
 
 void sendPacketToPlayer(RatId ratId)
 {
+    MW244BPacket pack;
+    pack.type = 1;
+    
+    //.... set other fields in the packet  that you need to set...
+    
+    ConvertOutgoing(&pack);
+    
+    if (sendto((int)M->theSocket(), &pack, sizeof(pack), 0,
+        (const sockaddr*)&groupAddr, sizeof(Sockaddr)) < 0)
+    { MWError("Sample error") ;}
+
+    
+    
 /*
 	MW244BPacket pack;
 	DataStructureX *packX;
@@ -514,17 +535,28 @@ void sendPacketToPlayer(RatId ratId)
 
 void processPacket (MWEvent *eventPacket)
 {
-/*
-	MW244BPacket		*pack = eventPacket->eventDetail;
-	DataStructureX		*packX;
-
-	switch(pack->type) {
-	case PACKET_TYPE_X:
-	  packX = (DataStructureX *) &(pack->body);
-	  break;
-        case ...
-	}
-*/
+    
+    MW244BPacket            *pack = eventPacket->eventDetail;
+    printf("%d received\n", pack->type);
+    
+    //DataStructureX                *packX;
+     
+     switch(pack->type) {
+         case NEW:
+             //packX = (DataStructureX *) &(pack->body);
+             break;
+         case MOV:
+             break;
+         case FIR:
+             break;
+         case HIT:
+             break;
+         case EXT:
+             break;
+     }
+    
+     
+    
 
 }
 
@@ -560,8 +592,7 @@ netInit()
 	   socket - you cannot have more than one player on one
 	   machine without this */
 	reuse = 1;
-	if (setsockopt(M->theSocket(), SOL_SOCKET, SO_REUSEADDR, &reuse,
-		   sizeof(reuse)) < 0) {
+	if (setsockopt(M->theSocket(), SOL_SOCKET, SO_REUSEPORT, &reuse, sizeof(reuse)) < 0) {
 		MWError("setsockopt failed (SO_REUSEADDR)");
 	}
 
@@ -605,6 +636,46 @@ netInit()
 	printf("\n");
 
 	/* set up some stuff strictly for this local sample */
+    
+    
+    //sendPacketToPlayer(RatId(0));
+    
+    struct timeval oldtime,newtime;
+    
+    gettimeofday(&oldtime,0);
+    gettimeofday(&newtime,0);
+        //cout << newtime.tv_usec / 1000 <<" : " << oldtime.tv_usec / 1000 + 500 <<"\n";
+    
+    do{
+        gettimeofday(&newtime,0);
+        
+        MWEvent		event;
+        MW244BPacket	incoming;
+        
+        event.eventDetail = &incoming;
+        NextEvent(&event, M->theSocket());
+        
+        switch(event.eventType) {
+                 
+            case EVENT_NETWORK:
+                processPacket(&event);
+                break;
+                        
+        }
+        
+               cout << newtime.tv_sec  <<" : " << oldtime.tv_sec + 1.5 <<"\n";
+        
+        
+    } while (newtime.tv_sec < oldtime.tv_sec + 1.5 );
+
+
+
+           cout << newtime.tv_usec / 1000 <<" : " << oldtime.tv_usec / 1000 + 500 <<"\n";
+
+    
+   
+    
+    
 	M->myRatIdIs(0);
 	M->scoreIs(0);
 	SetMyRatIndexType(0);

@@ -85,6 +85,12 @@ SOFTWARE.
 #define	RIGHT		1
 #define	REAR		2
 #define	FRONT		3
+#define NEW          0
+#define MOV          1
+#define FIR          2
+#define HIT          3
+#define EXT          4
+
 
 /* types */
    using namespace std;
@@ -246,105 +252,6 @@ protected:
 };
 extern MazewarInstance::Ptr M;
 
-class Missile{
-public:
-	bool playing, visible;
-	Loc	x, y;
-	Direction dir;
-	static int inflight;
-
-
-	Missile() :  playing(0), visible(1), x(1), y(1), dir(NORTH){inflight++;};
-
-	Direction getdir() const 
-	{ 
-	 	return dir;
-	}
-    void dirIs(Direction dir) { 
-    	this->dir = dir; 
-    }
-
-	Loc xloc() const 
-	{ 
-		return this->x; 
-	}
-    void xlocIs(Loc xloc) { 
-    	this->x = xloc; 
-    }
-    Loc yloc() const { 
-    	return y; 
-    }
-    void ylocIs(Loc yloc) {
-     this->y = yloc; 
- 	}
-
-	void updateLoc(/*MazewarInstance * M*/){
-		if(isVisible() == true){
-			
-			if (dir == NORTH){
-				this->x = Loc(this->x.value() + 1);
-			}
-			else if(dir == SOUTH){
-				this->x = Loc(this->x.value() - 1);
-			}
-			else if(dir == EAST){
-				this->y = Loc(this->y.value() + 1);
-			}
-			else if(dir == WEST){
-				this->y = Loc(this->y.value() - 1);
-			}
-
-		}
-		else{
-			this->visible = false;
-
-		}
-		
-	}
-
-	bool isVisible()
-	{
-		/* prevent a blank wall at first glimpse */
-
-		register int	tx = this->x.value();
-		register int	ty = this->y.value(); 
-
-		if (tx >= MAZEXMAX || ty >= MAZEYMAX) {
-		  /* MAZE[XY]MAX is a power of 2 */
-		  return false;
-
-		  /* In real game, also check that square is
-		     unoccupied by another rat */
-		}
-
-
-
-		switch(dir.value()) {
-		case NORTH:	
-			if (M->maze_[tx+1][ty])	
-				return false; 
-			break;
-		case SOUTH:	
-			if (M->maze_[tx-1][ty])	
-				return false;
-			break;
-		case EAST:	
-			if (M->maze_[tx][ty+1])
-				return false; 
-			break;
-		case WEST:	
-			if (M->maze_[tx][ty-1])	
-				return false; 
-			break;
-		// default:
-			// MWError("bad direction in Forward");
-		}
-
-		return true;
-		
-	}
-
-};
 
 
 
@@ -466,6 +373,112 @@ void InvertScoreLine(RatIndexType);
 void NotifyPlayer(void);
 void DrawString(const char*, uint32_t, uint32_t, uint32_t);
 void StopWindow(void);
+
+class Missile{
+public:
+	bool playing, visible;
+	Loc	x, y;
+	Direction dir;
+	static int inflight;
+    
+    
+	Missile() :  playing(0), visible(1), x(1), y(1), dir(NORTH){inflight++;};
+    
+    ~Missile(){
+        this->inflight--;
+        clearSquare(x, y);
+    }
+    
+	Direction getdir() const
+	{
+	 	return dir;
+	}
+    void dirIs(Direction dir) {
+    	this->dir = dir;
+    }
+    
+	Loc xloc() const
+	{
+		return this->x;
+	}
+    void xlocIs(Loc xloc) {
+    	this->x = xloc;
+    }
+    Loc yloc() const {
+    	return y;
+    }
+    void ylocIs(Loc yloc) {
+        this->y = yloc;
+ 	}
+    
+	void updateLoc(/*MazewarInstance * M*/){
+		if(isVisible() == true){
+			
+			if (dir == NORTH){
+				this->x = Loc(this->x.value() + 1);
+			}
+			else if(dir == SOUTH){
+				this->x = Loc(this->x.value() - 1);
+			}
+			else if(dir == EAST){
+				this->y = Loc(this->y.value() + 1);
+			}
+			else if(dir == WEST){
+				this->y = Loc(this->y.value() - 1);
+			}
+            
+		}
+		else{
+			this->visible = false;
+            
+		}
+		
+	}
+    
+	bool isVisible()
+	{
+		/* prevent a blank wall at first glimpse */
+        
+		register int	tx = this->x.value();
+		register int	ty = this->y.value();
+        
+		if (tx >= MAZEXMAX || ty >= MAZEYMAX) {
+            /* MAZE[XY]MAX is a power of 2 */
+            return false;
+            
+            /* In real game, also check that square is
+		     unoccupied by another rat */
+		}
+        
+        
+        
+		switch(dir.value()) {
+            case NORTH:
+                if (M->maze_[tx+1][ty])
+                    return false;
+                break;
+            case SOUTH:
+                if (M->maze_[tx-1][ty])
+                    return false;
+                break;
+            case EAST:	
+                if (M->maze_[tx][ty+1])
+                    return false; 
+                break;
+            case WEST:	
+                if (M->maze_[tx][ty-1])	
+                    return false; 
+                break;
+                // default:
+                // MWError("bad direction in Forward");
+		}
+        
+		return true;
+		
+	}
+    
+};
+
 
 
 #endif

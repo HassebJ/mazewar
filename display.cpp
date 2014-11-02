@@ -1,7 +1,7 @@
 /* $Header: display.c,v 1.7 88/08/25 09:57:54 kent Exp $ */
 
 /*
- * display.c - Display management routines for MazeWar
+ * displaaasday.c - Display management routines for MazeWar
  *
  * Author:	Christopher A. Kent
  * 		Western Research Laboratory
