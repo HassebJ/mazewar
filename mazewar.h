@@ -285,6 +285,13 @@ typedef	struct {
 }					MW244BPacket;
 
 typedef	struct {
+	RatId id;
+	Loc	x;
+    Loc y;
+    
+}					Packet;
+
+typedef	struct {
 	short		eventType;
 	MW244BPacket	*eventDetail;	/* for incoming data */
 	Sockaddr	eventSource;
@@ -349,7 +356,7 @@ void ConvertOutgoing(MW244BPacket *);
 void ratState(void);
 void manageMissiles(void);
 void DoViewUpdate(void);
-void sendPacketToPlayer(RatId);
+void sendPacketToPlayer(RatId, int);
 void processPacket(MWEvent *);
 void netInit(void);
 

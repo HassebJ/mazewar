@@ -495,10 +495,32 @@ void DoViewUpdate()
  * before any call to sendto.
  */
 
-void sendPacketToPlayer(RatId ratId)
+void sendPacketToPlayer(RatId ratId , int packetType)
 {
     MW244BPacket pack;
-    pack.type = 1;
+    pack.type = packetType;
+    Packet *packX;
+    
+    switch(packetType) {
+        case NEW:
+            cout <<"packet : NEW f" << packetType << endl;
+            packX = (Packet *) &(pack.body);
+            packX->id = M->myRatId();
+            packX->x = M->xloc();
+            packX->y = M->yloc();
+            
+            
+            break;
+        case MOV:
+            break;
+        case FIR:
+            break;
+        case HIT:
+            break;
+        case EXT:
+            break;
+    }
+
     
     //.... set other fields in the packet  that you need to set...
     
@@ -538,12 +560,14 @@ void processPacket (MWEvent *eventPacket)
     
     MW244BPacket            *pack = eventPacket->eventDetail;
     printf("%d received\n", pack->type);
+    cout <<groupAddr.sin_addr.s_addr<<" addr "<<eventPacket->eventSource.sin_addr.s_addr<<endl;
     
-    //DataStructureX                *packX;
+    Packet                *packX;
      
      switch(pack->type) {
          case NEW:
-             //packX = (DataStructureX *) &(pack->body);
+             packX = (Packet *) &(pack->body);
+             cout << packX->x.value();
              break;
          case MOV:
              break;
@@ -637,14 +661,25 @@ netInit()
 
 	/* set up some stuff strictly for this local sample */
     
+  
+	
+
+	/* Get the multi-cast address ready to use in SendData()
+           calls. */
+	memcpy(&groupAddr, &nullAddr, sizeof(Sockaddr));
+	groupAddr.sin_addr.s_addr = htonl(MAZEGROUP);
     
-    //sendPacketToPlayer(RatId(0));
+    
+    sendPacketToPlayer(RatId(0), NEW);
+    
+    
     
     struct timeval oldtime,newtime;
     
     gettimeofday(&oldtime,0);
     gettimeofday(&newtime,0);
-        //cout << newtime.tv_usec / 1000 <<" : " << oldtime.tv_usec / 1000 + 500 <<"\n";
+    bool gotPacket = false;
+    
     
     do{
         gettimeofday(&newtime,0);
@@ -656,34 +691,29 @@ netInit()
         NextEvent(&event, M->theSocket());
         
         switch(event.eventType) {
-                 
+                
             case EVENT_NETWORK:
                 processPacket(&event);
+                gotPacket = true;
                 break;
-                        
+                
         }
         
-               cout << newtime.tv_sec  <<" : " << oldtime.tv_sec + 1.5 <<"\n";
+        //cout << newtime.tv_sec  <<" : " << oldtime.tv_sec + 0.5 <<"\n";
         
         
     } while (newtime.tv_sec < oldtime.tv_sec + 1.5 );
-
-
-
-           cout << newtime.tv_usec / 1000 <<" : " << oldtime.tv_usec / 1000 + 500 <<"\n";
-
     
-   
-    
-    
-	M->myRatIdIs(0);
-	M->scoreIs(0);
-	SetMyRatIndexType(0);
+    if (gotPacket == false) {
+        M->myRatIdIs(0);
+        M->scoreIs(0);
+        SetMyRatIndexType(0);
+        
+    }
+    else{
+        //cout <<"Packet received"<<endl;
+    }
 
-	/* Get the multi-cast address ready to use in SendData()
-           calls. */
-	memcpy(&groupAddr, &nullAddr, sizeof(Sockaddr));
-	groupAddr.sin_addr.s_addr = htonl(MAZEGROUP);
 
 }
 
