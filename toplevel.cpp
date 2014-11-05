@@ -20,8 +20,11 @@ static Sockaddr         groupAddr;
 #define MAX_OTHER_RATS  (MAX_RATS - 1)
 
 Missile * rockets[MAX_RATS];
+
 int main(int argc, char *argv[])
 {
+    srand (time(NULL));
+
     Loc x(1);
     Loc y(5);
     Direction dir(0);
@@ -74,6 +77,7 @@ play(void)
 
 			case EVENT_S:
 				aboutFace();
+                        cout<<"ratId: "<<M->myRatId().value()<<endl;
 				break;
 
 			case EVENT_F:
@@ -103,6 +107,7 @@ play(void)
                        
             case EVENT_TIMEOUT:
                 manageMissiles();
+                
                 break;
 
 			case EVENT_INT:
@@ -313,7 +318,7 @@ void peekStop()
 void shoot()
 {
 	M->scoreIs( M->score().value()-1 );
-	UpdateScoreCard(M->myRatId().value());
+	UpdateScoreCard( MY_RAT_INDEX);
 	rockets[0] = new Missile();
 	rockets[0]->xlocIs(Loc(MY_X_LOC));
 	rockets[0]->ylocIs(Loc(MY_Y_LOC));
@@ -400,10 +405,19 @@ void MWError(char *s)
 /* This is just for the sample version, rewrite your own */
 Score GetRatScore(RatIndexType ratId)
 {
-    cout << ratId.value() <<" "<< 	M->myRatId().value()<<endl;
-  if (ratId.value() == 	M->myRatId().value())
-    { return(M->score()); }
-  else { return (0); }
+    unsigned short id = M->indexToId[ratId.value()];
+    for (int i = 0; i<MAX_RATS;i++){
+        if (M->mazeRats_[i].id.value() == id) {
+            return M->mazeRats_[i].score;
+        }
+    }
+//    cout << ratId.value() <<" "<< 	M->myRatId().value()<<endl;
+//  if (ratId.value() == 	M->myRatId().value())
+//    { return(M->score()); }
+//  else { return (0); }
+//    return (M->score());
+    return (0);
+    
 }
 
 /* ----------------------------------------------------------------------- */
@@ -411,9 +425,17 @@ Score GetRatScore(RatIndexType ratId)
 /* This is just for the sample version, rewrite your own */
 char *GetRatName(RatIndexType ratId)
 {
-  if (ratId.value() ==	M->myRatId().value())
-    { return(M->myName_); }
-  else { return ("Dummy"); }
+    unsigned short id = M->indexToId[ratId.value()];
+    for (int i = 0; i<MAX_RATS;i++){
+        if (M->mazeRats_[i].id.value() == id) {
+            return M->mazeRats_[i].name;
+        }
+    }
+//  if (ratId.value() ==	M->myRatId().value())
+//    { return(M->myName_); }
+//  else { return ("Dummy"); }
+//    return(M->myName_);
+    return ("Dummy");
 }
 
 /* ----------------------------------------------------------------------- */
@@ -499,26 +521,54 @@ void sendPacketToPlayer(RatId ratId , int packetType)
 {
     MW244BPacket pack;
     pack.type = packetType;
-    Packet *packX;
+    pack.ratId = M->myRatId();
+    NewPacket *_new;
+    BeatPacket *beat;
+    
+    printf("%d sent\n", pack.type);
+
     
     switch(packetType) {
         case NEW:
-            cout <<"packet : NEW f" << packetType << endl;
-            packX = (Packet *) &(pack.body);
-            packX->id = M->myRatId();
-            packX->x = M->xloc();
-            packX->y = M->yloc();
+        {
+            _new = (NewPacket *) &(pack.body);
+            _new->id = M->myRatId();
+            _new->x = M->xloc();
+            _new->y = M->yloc();
+            _new->dir = M->dir();
+            strncpy(_new->name, M->myName_, NAMESIZE);
             
+        
+            break;
+        }
+        case BEAT:
+        {
+            cout << MY_X_LOC<<":"<< MY_Y_LOC<<endl;
+            beat = (BeatPacket *) &(pack.body);
+            createRatList(beat);
+            
+            BeatPacket *t = beat;
+
             
             break;
+        }
         case MOV:
+        {
             break;
+        }
         case FIR:
+        {
             break;
-        case HIT:
+        }
+        case HIT:{
+        
+        
             break;
+        }
         case EXT:
+        {
             break;
+        }
     }
 
     
@@ -534,12 +584,12 @@ void sendPacketToPlayer(RatId ratId , int packetType)
     
 /*
 	MW244BPacket pack;
-	DataStructureX *packX;
+	DataStructureX *_new;
 
 	pack.type = PACKET_TYPE_X;
-	packX = (DataStructureX *) &pack.body;
-	packX->foo = d1;
-	packX->bar = d2;
+	_new = (DataStructureX *) &pack.body;
+	_new->foo = d1;
+	_new->bar = d2;
 
         ....
 
@@ -555,28 +605,138 @@ void sendPacketToPlayer(RatId ratId , int packetType)
 
 /* Sample of processPacket. */
 
+void addRat(Rat rat){
+    M->ratIs(rat, RatIndexType(M->getFreeIndex()));
+    M->indexToId[M->getFreeIndex()] = rat.id.value();
+    
+    UpdateScoreCard(RatIndexType(M->getFreeIndex()));
+    M->freeIndex++;
+}
+
 void processPacket (MWEvent *eventPacket)
 {
     
     MW244BPacket            *pack = eventPacket->eventDetail;
+       if (M->myRatId() == pack->ratId){
+           cout <<"returning"<<endl;
+        return;
+    }
     printf("%d received\n", pack->type);
-    cout <<groupAddr.sin_addr.s_addr<<" addr "<<eventPacket->eventSource.sin_addr.s_addr<<endl;
-    
-    Packet                *packX;
+    cout <<M->myRatId().value()<<" : "<<pack->ratId.value()<<endl;
+   
+    NewPacket                *_new;
      
      switch(pack->type) {
          case NEW:
-             packX = (Packet *) &(pack->body);
-             cout << packX->x.value();
+         {
+             _new = (NewPacket *) &(pack->body);
+             if (_new->id.value() < 8) {
+//                 M->ratIs(Rat(_new->id, _new->x, _new->y, _new->dir, Score(0), _new->name), RatIndexType(M->getFreeIndex()));
+//                 M->indexToId[M->getFreeIndex()] = _new->id.value();
+//                 
+//                 UpdateScoreCard(RatIndexType(M->getFreeIndex()));
+//                 M->freeIndex++;
+                 addRat(Rat(_new->id, _new->x, _new->y, _new->dir, Score(0), _new->name));
+
+                 
+             }
+             else{
+                 
+                 sendPacketToPlayer(RatId(0), BEAT);
+             }
+             
+
+             
              break;
+         }
          case MOV:
-             break;
+         {break;}
          case FIR:
-             break;
+         {break;}
          case HIT:
-             break;
+         {break;}
          case EXT:
+         {break;}
+         case BEAT:
+         {   cout <<"beating"<<endl;
+             BeatPacket *beat  = (BeatPacket *) &(pack->body);
+             
+             unsigned short temp = beat->one.id.value();
+             if(beat->one.id.value() < 8)
+                 temp = beat->one.id.value();
+             if(beat->two.id.value() > temp && beat->two.id.value() < 8)
+                 temp = beat->two.id.value();
+             if(beat->three.id.value() > temp && beat->three.id.value() < 8)
+                 temp = beat->three.id.value();
+             if(beat->four.id.value() > temp && beat->four.id.value() < 8)
+                 temp = beat->four.id.value();
+             if(beat->five.id.value() > temp && beat->five.id.value() < 8)
+                 temp = beat->five.id.value();
+             if(beat->six.id.value() > temp && beat->six.id.value() < 8)
+                 temp = beat->six.id.value();
+             if(beat->seven.id.value() > temp && beat->seven.id.value() < 8)
+                 temp = beat->seven.id.value();
+             
+             M->myRatIdIs(RatId(temp+1));
+             M->scoreIs(0);
+             SetMyRatIndexType(0);
+             M->freeIndex++;
+             
+             M->ratIs(Rat(M->myRatId(), M->xloc(), M->yloc(), M->dir(), M->score(), M->myName_), RatIndexType(0));
+             M->indexToId[0] = temp + 1;
+             M->isSet = true;
+             
+             if(beat->one.id.value() < 8){
+//                 M->ratIs(Rat(beat->one.id, beat->one.x, beat->one.y, beat->one.dir, beat->one.score, beat->one.name), RatIndexType(M->getFreeIndex()));
+//                 M->indexToId[M->getFreeIndex()] = beat->one.id.value();
+//                 M->freeIndex++;
+                 addRat(beat->one);
+                 
+             }
+             if(beat->two.id.value() < 8){
+//                 M->ratIs(Rat(beat->two.id, beat->two.x, beat->two.y, beat->two.dir, beat->two.score, beat->two.name), RatIndexType(M->getFreeIndex()));
+//                 M->indexToId[M->getFreeIndex()] = beat->two.id.value();
+//                 M->freeIndex++;
+                 addRat(beat->two);
+             }
+             if(beat->three.id.value() < 8){
+                 M->ratIs(Rat(beat->three.id, beat->three.x, beat->three.y, beat->three.dir, beat->three.score, beat->three.name), RatIndexType(M->getFreeIndex()));
+                 M->indexToId[M->getFreeIndex()] = beat->three.id.value();
+                 M->freeIndex++;
+             }
+             if(beat->four.id.value() < 8){
+                 M->ratIs(Rat(beat->four.id, beat->four.x, beat->four.y, beat->four.dir, beat->four.score, beat->four.name), RatIndexType(M->getFreeIndex()));
+                 M->indexToId[M->getFreeIndex()] = beat->four.id.value();
+                 M->freeIndex++;
+             }
+             if(beat->five.id.value() < 8){
+                 M->ratIs(Rat(beat->five.id, beat->five.x, beat->five.y, beat->five.dir, beat->five.score, beat->five.name), RatIndexType(M->getFreeIndex()));
+                 M->indexToId[M->getFreeIndex()] = beat->five.id.value();
+                 M->freeIndex++;
+             }
+             if(beat->six.id.value() < 8){
+                 M->ratIs(Rat(beat->six.id, beat->six.x, beat->six.y, beat->six.dir, beat->six.score, beat->six.name), RatIndexType(M->getFreeIndex()));
+                 M->indexToId[M->getFreeIndex()] = beat->six.id.value();
+                 M->freeIndex++;
+             }
+             if(beat->seven.id.value() < 8){
+                 M->ratIs(Rat(beat->seven.id, beat->seven.x, beat->seven.y, beat->seven.dir, beat->seven.score, beat->seven.name), RatIndexType(M->getFreeIndex()));
+                 M->indexToId[M->getFreeIndex()] = beat->seven.id.value();
+                 M->freeIndex++;
+             }
+             if(beat->eight.id.value() < 8){
+                 M->ratIs(Rat(beat->eight.id, beat->eight.x, beat->eight.y, beat->eight.dir, beat->eight.score, beat->eight.name), RatIndexType(M->getFreeIndex()));
+                 M->indexToId[M->getFreeIndex()] = beat->eight.id.value();
+                 M->freeIndex++;
+             }
+             
+             sendPacketToPlayer(M->myRatId(), NEW);
+             
+             
+             
+             
              break;
+         }
      }
     
      
@@ -590,6 +750,114 @@ void processPacket (MWEvent *eventPacket)
    It is here to provide an example of how to open a UDP port.
    You might choose to use a different strategy
  */
+//void createRatList (BeatPacket* list){
+//    RatId temp;
+//    
+//    temp = M->mazeRats_[0].id;
+//    list->one = temp;
+//    
+//    temp = M->mazeRats_[1].id;
+//    list->two = temp;
+//    
+//    temp = M->mazeRats_[2].id;
+//    list->three = temp;
+//    
+//    temp = M->mazeRats_[3].id;
+//    list->four = temp;
+//    
+//    temp = M->mazeRats_[4].id;
+//    list->five = temp;
+//    
+//    temp = M->mazeRats_[5].id;
+//    list->six = temp;
+//    
+//    temp = M->mazeRats_[6].id;
+//    list->seven = temp;
+//    
+//    temp = M->mazeRats_[7].id;
+//    list->eight = temp;
+//    
+//}
+
+
+void createRatList(BeatPacket* list){
+    Rat temp;
+    temp.id = M->mazeRats_[0].id;
+    temp.x = M->mazeRats_[0].x;
+    temp.y = M->mazeRats_[0].y;
+    temp.dir = M->mazeRats_[0].dir;
+    temp.score = M->mazeRats_[0].score;
+    strncpy(temp.name, M->mazeRats_[0].name, NAMESIZE);
+
+    
+    list->one =temp;
+    
+    temp.id = M->mazeRats_[1].id;
+    temp.x = M->mazeRats_[1].x;
+    temp.y = M->mazeRats_[1].y;
+    temp.dir = M->mazeRats_[1].dir;
+    temp.score = M->mazeRats_[1].score;
+    strncpy(temp.name, M->mazeRats_[1].name, NAMESIZE);
+    
+    list->two =temp;
+    
+    temp.id = M->mazeRats_[2].id;
+    temp.x = M->mazeRats_[2].x;
+    temp.y = M->mazeRats_[2].y;
+    temp.dir = M->mazeRats_[2].dir;
+    temp.score = M->mazeRats_[2].score;
+    strncpy(temp.name, M->mazeRats_[2].name, NAMESIZE);
+    
+    list->three =temp;
+    
+    temp.id = M->mazeRats_[3].id;
+    temp.x = M->mazeRats_[3].x;
+    temp.y = M->mazeRats_[3].y;
+    temp.dir = M->mazeRats_[3].dir;
+    temp.score = M->mazeRats_[3].score;
+    strncpy(temp.name, M->mazeRats_[3].name, NAMESIZE);
+    
+    list->four =temp;
+    
+    temp.id = M->mazeRats_[4].id;
+    temp.x = M->mazeRats_[4].x;
+    temp.y = M->mazeRats_[4].y;
+    temp.dir = M->mazeRats_[4].dir;
+    temp.score = M->mazeRats_[4].score;
+    strncpy(temp.name, M->mazeRats_[4].name, NAMESIZE);
+    
+    list->five =temp;
+    
+    temp.id = M->mazeRats_[5].id;
+    temp.x = M->mazeRats_[5].x;
+    temp.y = M->mazeRats_[5].y;
+    temp.dir = M->mazeRats_[5].dir;
+    temp.score = M->mazeRats_[5].score;
+    strncpy(temp.name, M->mazeRats_[5].name, NAMESIZE);
+    
+    list->six =temp;
+    
+    temp.id = M->mazeRats_[6].id;
+    temp.x = M->mazeRats_[6].x;
+    temp.y = M->mazeRats_[6].y;
+    temp.dir = M->mazeRats_[6].dir;
+    temp.score = M->mazeRats_[6].score;
+    strncpy(temp.name, M->mazeRats_[6].name, NAMESIZE);
+    
+    list->seven =temp;
+    
+    temp.id = M->mazeRats_[7].id;
+    temp.x = M->mazeRats_[7].x;
+    temp.y = M->mazeRats_[7].y;
+    temp.dir = M->mazeRats_[7].dir;
+    temp.score = M->mazeRats_[7].score;
+    strncpy(temp.name, M->mazeRats_[7].name, NAMESIZE);
+    
+    list->eight =temp;
+
+    
+}
+
 void
 netInit()
 {
@@ -670,7 +938,7 @@ netInit()
 	groupAddr.sin_addr.s_addr = htonl(MAZEGROUP);
     
     
-    sendPacketToPlayer(RatId(0), NEW);
+    sendPacketToPlayer(RatId(rand()), NEW);
     
     
     
@@ -704,14 +972,27 @@ netInit()
         
     } while (newtime.tv_sec < oldtime.tv_sec + 1.5 );
     
-    if (gotPacket == false) {
+    if (M->isSet == false) {
         M->myRatIdIs(0);
         M->scoreIs(0);
         SetMyRatIndexType(0);
         
+        M->ratIs(Rat(M->myRatId(), M->xloc(), M->yloc(), M->dir(), Score(0), M->myName_), RatIndexType(0));
+        M->indexToId[0] = 0;
+        M->isSet = true;
+        M->freeIndex++;
+        
+//        BeatPacket *beat;
+//        
+//        createRatList(beat);
+//        
+//        BeatPacket *t = beat;
+        
+        
+        
     }
     else{
-        //cout <<"Packet received"<<endl;
+        //cout <<"NewPacket received"<<endl;
     }
 
 

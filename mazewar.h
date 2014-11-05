@@ -49,6 +49,9 @@ SOFTWARE.
 #include "Nominal.h"
 #include "Exception.h"
 #include <string>
+#include <map>
+#include <stdlib.h>
+#include <time.h>
 /* fundamental constants */
 
 #ifndef	TRUE
@@ -90,10 +93,12 @@ SOFTWARE.
 #define FIR          2
 #define HIT          3
 #define EXT          4
+#define BEAT          5
 
 
 /* types */
    using namespace std;
+
 
 typedef	struct sockaddr_in			Sockaddr;
 typedef bool	               		MazeRow[MAZEYMAX];
@@ -144,6 +149,8 @@ typedef	char						RatName[NAMESIZE];
 	public:
 		RatId(unsigned short num) : Ordinal<RatId, unsigned short>(num) {
 		}
+        RatId() : Ordinal<RatId, unsigned short>(-(short)rand()) {
+		}
 	};
 
  	class TokenId : public Ordinal<TokenId, long> {
@@ -165,10 +172,16 @@ class RatAppearance{
 class Rat{
 
 public:
-	Rat() :  playing(0), x(1), y(1), dir(NORTH){};
-	bool playing;
+	Rat() :  playing(0), x(1), y(1), dir(NORTH), score(0){};
+    Rat(RatId id_, Loc x_, Loc y_, Direction dir_, Score score_, RatName name_) : id(id_.value()), playing(1), x(x_.value()), y(y_.value()), dir(dir_.value()), score(score_.value()){
+        strncpy(name, name_, NAMESIZE);
+    }
+    bool playing;
+    RatId id;
 	Loc	x, y;
 	Direction dir;
+    Score score;
+    RatName name;
 };
 
 
@@ -220,15 +233,26 @@ class MazewarInstance :  public Fwk::NamedInterface  {
     void activeIs(int active) { this->active_ = active; }
     inline Rat rat(RatIndexType num) const { return mazeRats_[num.value()]; }
     void ratIs(Rat rat, RatIndexType num) { this->mazeRats_[num.value()] = rat; }
+    inline int getFreeIndex(){
+        if (freeIndex >7)
+            throw RangeException("Error: Number of Rats greater than MAX_RATS.\n");
+        else
+            return freeIndex;
+    }
 
     MazeType maze_;
+    bool isSet;
     RatName myName_;
+    Rat mazeRats_[MAX_RATS];
+    map <int, unsigned short> indexToId;
+    int freeIndex;
 protected:
-	MazewarInstance(string s) : Fwk::NamedInterface(s), dir_(0), dirPeek_(0), myRatId_(0), score_(0),
-		xloc_(1), yloc_(3), xPeek_(0), yPeek_(0) {
-		myAddr_ = (Sockaddr*)malloc(sizeof(Sockaddr));
-		if(!myAddr_) {
-			printf("Error allocating sockaddr variable");
+	MazewarInstance(string s) : Fwk::NamedInterface(s), dir_(0), dirPeek_(0), myRatId_(rand()), score_(0),
+		xloc_(1), yloc_(3), xPeek_(0), yPeek_(0), isSet(false) {
+            freeIndex = 0;
+            myAddr_ = (Sockaddr*)malloc(sizeof(Sockaddr));
+            if(!myAddr_) {
+                printf("Error allocating sockaddr variable");
 		}
 	}
 	Direction	dir_;
@@ -236,7 +260,8 @@ protected:
 
     long mazePort_;
     Sockaddr *myAddr_;
-    Rat mazeRats_[MAX_RATS];
+    
+    
 
     
     RatId myRatId_;
@@ -279,17 +304,52 @@ extern MazewarInstance::Ptr M;
 
 extern unsigned short	ratBits[];
 /* replace this with appropriate definition of your own */
-typedef	struct {
+typedef	struct MW244BPacket{
 	unsigned char type;
 	u_long	body[256];
-}					MW244BPacket;
+    RatId ratId;
+    
+    MW244BPacket() : ratId(rand()){}
+};
 
 typedef	struct {
 	RatId id;
 	Loc	x;
     Loc y;
+    Direction dir;
+    RatName name;
+}					NewPacket;
+
+typedef	struct {
+	RatId id;
+	Loc	x;
+    Loc y;
+}					OtherNewPacket;
+
+typedef	struct {
+	Rat one;
+    Rat two;
+    Rat three;
+
+    Rat four;
+    Rat five;
+    Rat six;
+    Rat seven;
+    Rat eight;
     
-}					Packet;
+}					BeatPacket;
+
+//typedef	struct {
+//	RatId one;
+//    RatId two;
+//    RatId three;
+//    RatId four;
+//    RatId five;
+//    RatId six;
+//    RatId seven;
+//    RatId eight;
+//    
+//}					BeatPacket;
 
 typedef	struct {
 	short		eventType;
@@ -337,6 +397,7 @@ bool emptyBehind();
 
 /* toplevel.c */
 void play(void);
+void createRatList(BeatPacket* list);
 void aboutFace(void);
 void leftTurn(void);
 void rightTurn(void);
@@ -356,7 +417,7 @@ void ConvertOutgoing(MW244BPacket *);
 void ratState(void);
 void manageMissiles(void);
 void DoViewUpdate(void);
-void sendPacketToPlayer(RatId, int);
+void sendPacketToPlayer(RatId ratId , int packetType);
 void processPacket(MWEvent *);
 void netInit(void);
 
