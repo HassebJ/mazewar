@@ -97,7 +97,7 @@ SOFTWARE.
 
 
 /* types */
-   using namespace std;
+//   using namespace std;
 
 
 typedef	struct sockaddr_in			Sockaddr;
@@ -110,6 +110,22 @@ typedef	struct {XYpoint	p1, p2;}	XYpair;
 typedef	struct {short	xcor, ycor;}XY;
 typedef	struct {unsigned short	bits[16];}	BitCell;
 typedef	char						RatName[NAMESIZE];
+
+
+template<class T>
+struct map_data_compare : public std::binary_function<typename T::value_type,
+typename T::mapped_type,
+bool>
+{
+public:
+    bool operator() (typename T::value_type &pair,
+                     typename T::mapped_type i) const
+    {
+        return pair.second == i;
+    }
+};
+
+typedef map<unsigned short, int> mapType;
 
 
  	class Direction : public Ordinal<Direction, short> {
@@ -244,7 +260,8 @@ class MazewarInstance :  public Fwk::NamedInterface  {
     bool isSet;
     RatName myName_;
     Rat mazeRats_[MAX_RATS];
-    map <int, unsigned short> indexToId;
+//    map <unsigned short, int> indexToId;
+    mapType indexToId;
     int freeIndex;
 protected:
 	MazewarInstance(string s) : Fwk::NamedInterface(s), dir_(0), dirPeek_(0), myRatId_(rand()), score_(0),
@@ -324,7 +341,25 @@ typedef	struct {
 	RatId id;
 	Loc	x;
     Loc y;
-}					OtherNewPacket;
+    Direction dir;
+}					MovPacket;
+
+typedef	struct{
+//	bool playing, visible;
+	Loc	x, y;
+	Direction dir;
+//	static int inflight;
+    RatId id;
+} FirPacket;
+
+
+typedef	struct HitPacket{
+	RatId preyId;
+	Score preyScore;
+    RatId predatorId;
+	Score predatorScore;
+    HitPacket ():predatorScore(0), preyScore(0){}
+}					;
 
 typedef	struct {
 	Rat one;
@@ -397,7 +432,9 @@ bool emptyBehind();
 
 /* toplevel.c */
 void play(void);
+void sendPacketToPlayer(HitPacket h , int packetType);
 void createRatList(BeatPacket* list);
+int idToIndex(const unsigned short value);
 void aboutFace(void);
 void leftTurn(void);
 void rightTurn(void);
@@ -448,9 +485,12 @@ public:
 	Loc	x, y;
 	Direction dir;
 	static int inflight;
+    RatId id;
     
     
-	Missile() :  playing(0), visible(1), x(1), y(1), dir(NORTH){inflight++;};
+	Missile() :  playing(0), visible(1), x(1), y(1), dir(NORTH), id(M->myRatId()){
+//        inflight++;
+    };
     
     ~Missile(){
         this->inflight--;

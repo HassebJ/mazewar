@@ -449,7 +449,6 @@ SetRatPosition(RatIndexType ratIndex, Loc x_loc, Loc y_loc, Direction dir)
 	newRat.y = y_loc;
 	newRat.dir = dir;
 	M->ratIs(newRat, ratIndex);
-
 	clearPosition(ratIndex, x_loc, y_loc);
 }
 

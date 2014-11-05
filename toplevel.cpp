@@ -1,3 +1,4 @@
+
 /*
  *   FILE: toplevel.c
  * AUTHOR: name (email)
@@ -82,6 +83,7 @@ play(void)
 
 			case EVENT_F:
 				forward();
+                sendPacketToPlayer(RatId(0), MOV);
 				break;
 
 			case EVENT_D:
@@ -318,21 +320,27 @@ void peekStop()
 void shoot()
 {
 	M->scoreIs( M->score().value()-1 );
+    M->mazeRats_[MY_RAT_INDEX].score = Score(M->mazeRats_[MY_RAT_INDEX].score.value() - 1);
 	UpdateScoreCard( MY_RAT_INDEX);
-	rockets[0] = new Missile();
-	rockets[0]->xlocIs(Loc(MY_X_LOC));
-	rockets[0]->ylocIs(Loc(MY_Y_LOC));
-	rockets[0]->dirIs(Direction(MY_DIR));
-	cout << rockets[0]->x.value() << " " << rockets[0]->y.value() << " "<< rockets[0]->x.value() <<" "<< rockets[0]->dir.value()<<endl;
+	rockets[Missile::inflight] = new Missile();
+	rockets[Missile::inflight]->xlocIs(Loc(MY_X_LOC));
+	rockets[Missile::inflight]->ylocIs(Loc(MY_Y_LOC));
+	rockets[Missile::inflight]->dirIs(Direction(MY_DIR));
+	cout << rockets[Missile::inflight]->x.value() << " " << rockets[Missile::inflight]->y.value() << " "<< rockets[Missile::inflight]->x.value() <<" "<< rockets[Missile::inflight]->dir.value()<<endl;
 
-	rockets[0]->updateLoc();
+	rockets[Missile::inflight]->updateLoc();
 
-	cout << rockets[0]->x.value() << " " << rockets[0]->y.value() << " "<< rockets[0]->x.value() <<" "<< rockets[0]->dir.value()<<endl;
-	if(rockets[0]->visible == true){
-		showMissile(rockets[0]->xloc(), rockets[0]->yloc(), rockets[0]->getdir(), MY_X_LOC, MY_X_LOC, FALSE);
+	cout << rockets[Missile::inflight]->x.value() << " " << rockets[Missile::inflight]->y.value() << " "<< rockets[Missile::inflight]->x.value() <<" "<< rockets[Missile::inflight]->dir.value()<<endl;
+	if(rockets[Missile::inflight]->visible == true){
+		showMissile(rockets[Missile::inflight]->xloc(), rockets[Missile::inflight]->yloc(), rockets[Missile::inflight]->getdir(), MY_X_LOC, MY_X_LOC, FALSE);
+     
+        sendPacketToPlayer(RatId(0), FIR);
+        
+        Missile::inflight++;
+        
 	}
     else{
-        delete rockets[0];
+        delete rockets[Missile::inflight];
     }
     
     updateView = TRUE;
@@ -467,23 +475,60 @@ void ratStates()
 void manageMissiles()
 {
 	// for(int i=0; i<MAX_RATS; i++){
+    if (Missile::inflight - 1 >= MAX_RATS) {
+        for(int i = 0; i < Missile::inflight -1; i++){
+            delete rockets[i];
+        }
+        return;
+    }
 
 	
 	
 
-	if(Missile::inflight != 0 ){
-		Loc ox = rockets[0]->xloc();
-		Loc oy = rockets[0]->yloc();
-		rockets[0]->updateLoc();
-		if(rockets[0]->visible == true){
+	for(int i = 0; i < Missile::inflight ;i++ ){
+		Loc ox = rockets[i]->xloc();
+		Loc oy = rockets[i]->yloc();
+		rockets[i]->updateLoc();
+		if(rockets[i]->visible == true){
 		
-			showMissile(rockets[0]->xloc(), rockets[0]->yloc(), rockets[0]->getdir(), ox, oy, TRUE);
+			showMissile(rockets[i]->xloc(), rockets[i]->yloc(), rockets[i]->getdir(), ox, oy, TRUE);
+            for(int j = 0; j < MAX_RATS; j++){
+                if(rockets[i]->xloc().value() == M->mazeRats_[j].x.value() && rockets[i]->yloc().value() == M->mazeRats_[j].y.value()){
+                    if(M->mazeRats_[j].id.value() == M->myRatId().value()){
+                        M->scoreIs( M->score().value()-5 );
+                    }
+                    
+                    HitPacket h;
+                    
+                    int index = idToIndex(M->mazeRats_[j].id.value());
+                    h.preyId = M->mazeRats_[j].id;
+                    M->mazeRats_[index].score = Score(M->mazeRats_[index].score.value() - 5);
+                    h.preyScore = M->mazeRats_[index].score;
+                    UpdateScoreCard(RatIndexType(index));
+                    
+                    index = idToIndex(rockets[i]->id.value());
+                    h.predatorId = rockets[i]->id;
+                    M->mazeRats_[index].score = Score(M->mazeRats_[index].score.value() + 10);
+                    h.predatorScore = M->mazeRats_[index].score;
+                    UpdateScoreCard(RatIndexType(index));
+                    
+                    sendPacketToPlayer(h , HIT);
+                    
+                    rockets[i]->visible = false;
+                    delete rockets[i];
+                    
+                    
+                    
+                    
+                }
+            }
+
 			
 
 			
 		}
 		else{
-			delete rockets[0];
+			delete rockets[i];
 		}
 
 	}
@@ -524,6 +569,8 @@ void sendPacketToPlayer(RatId ratId , int packetType)
     pack.ratId = M->myRatId();
     NewPacket *_new;
     BeatPacket *beat;
+    MovPacket * mov ;
+    FirPacket * fir;
     
     printf("%d sent\n", pack.type);
 
@@ -547,17 +594,26 @@ void sendPacketToPlayer(RatId ratId , int packetType)
             beat = (BeatPacket *) &(pack.body);
             createRatList(beat);
             
-            BeatPacket *t = beat;
-
-            
             break;
         }
         case MOV:
         {
+            mov = (MovPacket *) &(pack.body);
+            mov->id = M->myRatId();
+            mov->x = M->xloc();
+            mov->y = M->yloc();
+            mov->dir = M->dir();
+            
             break;
         }
         case FIR:
         {
+            fir = (FirPacket *) &(pack.body);
+            fir->id = M->myRatId();
+            fir->x = rockets[Missile::inflight]->x;
+            fir->y = rockets[Missile::inflight]->y;
+            fir->dir = rockets[Missile::inflight]->dir;
+            
             break;
         }
         case HIT:{
@@ -579,50 +635,77 @@ void sendPacketToPlayer(RatId ratId , int packetType)
     if (sendto((int)M->theSocket(), &pack, sizeof(pack), 0,
         (const sockaddr*)&groupAddr, sizeof(Sockaddr)) < 0)
     { MWError("Sample error") ;}
+}
 
+void sendPacketToPlayer(HitPacket h , int packetType)
+{
+    MW244BPacket pack;
+    pack.type = packetType;
+    pack.ratId = M->myRatId();
+    HitPacket * hit ;
+    
+    printf("%d sent\n", pack.type);
     
     
-/*
-	MW244BPacket pack;
-	DataStructureX *_new;
+    switch(packetType) {
+        case HIT :{
+            hit = (HitPacket *) &(pack.body);
+            hit->preyId = h.preyId;
+            hit->preyScore = h.preyScore;
+            hit->predatorId = h.predatorId;
+            hit->predatorScore = h.predatorScore;
 
-	pack.type = PACKET_TYPE_X;
-	_new = (DataStructureX *) &pack.body;
-	_new->foo = d1;
-	_new->bar = d2;
-
-        ....
-
-	ConvertOutgoing(pack);
-
-	if (sendto((int)mySocket, &pack, sizeof(pack), 0,
-		   (Sockaddr) destSocket, sizeof(Sockaddr)) < 0)
-	  { MWError("Sample error") };
-*/
+            
+            break;
+        }
+        case EXT:
+        {
+            break;
+        }
+    }
+    
+    
+    //.... set other fields in the packet  that you need to set...
+    
+    ConvertOutgoing(&pack);
+    
+    if (sendto((int)M->theSocket(), &pack, sizeof(pack), 0,
+               (const sockaddr*)&groupAddr, sizeof(Sockaddr)) < 0)
+    { MWError("Sample error") ;}
 }
 
 /* ----------------------------------------------------------------------- */
 
-/* Sample of processPacket. */
-
-void addRat(Rat rat){
-    M->ratIs(rat, RatIndexType(M->getFreeIndex()));
-    M->indexToId[M->getFreeIndex()] = rat.id.value();
+int idToIndex(const unsigned short value){
     
-    UpdateScoreCard(RatIndexType(M->getFreeIndex()));
-    M->freeIndex++;
+    
+    map<unsigned short, int>::iterator it  = find_if( M->indexToId.begin(), M->indexToId.end(), bind2nd(map_data_compare<mapType>(), value) );
+    
+    
+    if ( it != M->indexToId.end() )
+    {
+        
+//        std::cout << "Found index:" << it->first << " for value:" << it->second << std::endl;
+        return it->first;
+    }
+//    else
+//    {
+//        std::cout << "Error: move packet receicved for unknown RatId" << value << std::endl;
+//    }
 }
+
+/* Sample of processPacket. */
 
 void processPacket (MWEvent *eventPacket)
 {
     
     MW244BPacket            *pack = eventPacket->eventDetail;
        if (M->myRatId() == pack->ratId){
-           cout <<"returning"<<endl;
+//           cout <<"returning"<<endl;
         return;
     }
     printf("%d received\n", pack->type);
-    cout <<M->myRatId().value()<<" : "<<pack->ratId.value()<<endl;
+//    cout <<M->myRatId().value()<<" : "<<pack->ratId.value()<<endl;
    
     NewPacket                *_new;
      
@@ -631,13 +714,17 @@ void processPacket (MWEvent *eventPacket)
          {
              _new = (NewPacket *) &(pack->body);
              if (_new->id.value() < 8) {
-//                 M->ratIs(Rat(_new->id, _new->x, _new->y, _new->dir, Score(0), _new->name), RatIndexType(M->getFreeIndex()));
-//                 M->indexToId[M->getFreeIndex()] = _new->id.value();
-//                 
-//                 UpdateScoreCard(RatIndexType(M->getFreeIndex()));
-//                 M->freeIndex++;
-                 addRat(Rat(_new->id, _new->x, _new->y, _new->dir, Score(0), _new->name));
-
+//                 SetRatPosition(RatIndexType (M->getFreeIndex()), _new->x, _new->y, _new->dir);
+                 
+                 M->ratIs(Rat(_new->id, _new->x, _new->y, _new->dir, Score(0), _new->name), RatIndexType(M->getFreeIndex()));
+                 M->indexToId[M->getFreeIndex()] = _new->id.value();
+                 
+                 
+                 SetRatPosition(RatIndexType (M->getFreeIndex()), _new->x, _new->y, _new->dir);
+                 UpdateScoreCard(RatIndexType(M->getFreeIndex()));
+                 
+                                 M->freeIndex++;
+                 
                  
              }
              else{
@@ -650,15 +737,62 @@ void processPacket (MWEvent *eventPacket)
              break;
          }
          case MOV:
-         {break;}
+         {
+             MovPacket * mov = (MovPacket *) &(pack->body);
+             
+             int index = idToIndex(mov->id.value());
+             SetRatPosition(RatIndexType(index), mov->x, mov->y, mov->dir);
+             
+//             const unsigned short value = mov->id.value();
+//             
+//             map<unsigned short, int>::iterator it  = find_if( M->indexToId.begin(), M->indexToId.end(), bind2nd(map_data_compare<mapType>(), value) );
+//             
+//             
+//             if ( it != M->indexToId.end() )
+//             {
+//               
+//                 std::cout << "Found index:" << it->first << " for value:" << it->second << std::endl;
+//                 SetRatPosition(RatIndexType(it->first), mov->x, mov->y, mov->dir);
+//             }
+//             else
+//             {
+//                 std::cout << "Error: move packet receicved for unknown RatId" << value << std::endl;
+//             }
+             
+             
+             break;
+         }
          case FIR:
-         {break;}
+         {
+             FirPacket *fir = (FirPacket *) &(pack->body);
+             rockets[Missile::inflight] = new Missile();
+             rockets[Missile::inflight]->xlocIs(fir->x);
+             rockets[Missile::inflight]->ylocIs(fir->y);
+             rockets[Missile::inflight]->dirIs(fir->dir);
+             rockets[Missile::inflight]->dirIs(fir->dir);
+             rockets[Missile::inflight]->playing = true;
+             
+             break;
+         }
          case HIT:
-         {break;}
+         {
+             HitPacket * hit = (HitPacket *) &(pack->body);
+             
+             int index = idToIndex(hit->preyId.value());
+             M->mazeRats_[index].score = hit->preyScore;
+             UpdateScoreCard(RatIndexType(index));
+             
+             index = idToIndex(hit->predatorId.value());
+             M->mazeRats_[index].score = hit->predatorScore;
+             UpdateScoreCard(RatIndexType(index));
+
+
+             break;
+         }
          case EXT:
          {break;}
          case BEAT:
-         {   cout <<"beating"<<endl;
+         {
              BeatPacket *beat  = (BeatPacket *) &(pack->body);
              
              unsigned short temp = beat->one.id.value();
@@ -687,46 +821,55 @@ void processPacket (MWEvent *eventPacket)
              M->isSet = true;
              
              if(beat->one.id.value() < 8){
-//                 M->ratIs(Rat(beat->one.id, beat->one.x, beat->one.y, beat->one.dir, beat->one.score, beat->one.name), RatIndexType(M->getFreeIndex()));
-//                 M->indexToId[M->getFreeIndex()] = beat->one.id.value();
-//                 M->freeIndex++;
-                 addRat(beat->one);
+                 M->ratIs(Rat(beat->one.id, beat->one.x, beat->one.y, beat->one.dir, beat->one.score, beat->one.name), RatIndexType(M->getFreeIndex()));
+                 M->indexToId[M->getFreeIndex()] = beat->one.id.value();
+                 
+                 SetRatPosition(RatIndexType (M->getFreeIndex()), beat->one.x, beat->one.y, beat->one.dir);
+                 M->freeIndex++;
+               
+                 
                  
              }
              if(beat->two.id.value() < 8){
-//                 M->ratIs(Rat(beat->two.id, beat->two.x, beat->two.y, beat->two.dir, beat->two.score, beat->two.name), RatIndexType(M->getFreeIndex()));
-//                 M->indexToId[M->getFreeIndex()] = beat->two.id.value();
-//                 M->freeIndex++;
-                 addRat(beat->two);
+                 M->ratIs(Rat(beat->two.id, beat->two.x, beat->two.y, beat->two.dir, beat->two.score, beat->two.name), RatIndexType(M->getFreeIndex()));
+                 M->indexToId[M->getFreeIndex()] = beat->two.id.value();
+                 SetRatPosition(RatIndexType (M->getFreeIndex()), beat->two.x, beat->two.y, beat->two.dir);
+                 M->freeIndex++;
              }
              if(beat->three.id.value() < 8){
                  M->ratIs(Rat(beat->three.id, beat->three.x, beat->three.y, beat->three.dir, beat->three.score, beat->three.name), RatIndexType(M->getFreeIndex()));
                  M->indexToId[M->getFreeIndex()] = beat->three.id.value();
+                                  SetRatPosition(RatIndexType (M->getFreeIndex()), beat->three.x, beat->three.y, beat->three.dir);
                  M->freeIndex++;
              }
              if(beat->four.id.value() < 8){
                  M->ratIs(Rat(beat->four.id, beat->four.x, beat->four.y, beat->four.dir, beat->four.score, beat->four.name), RatIndexType(M->getFreeIndex()));
                  M->indexToId[M->getFreeIndex()] = beat->four.id.value();
+                                  SetRatPosition(RatIndexType (M->getFreeIndex()), beat->four.x, beat->four.y, beat->four.dir);
                  M->freeIndex++;
              }
              if(beat->five.id.value() < 8){
                  M->ratIs(Rat(beat->five.id, beat->five.x, beat->five.y, beat->five.dir, beat->five.score, beat->five.name), RatIndexType(M->getFreeIndex()));
                  M->indexToId[M->getFreeIndex()] = beat->five.id.value();
+                                  SetRatPosition(RatIndexType (M->getFreeIndex()), beat->five.x, beat->five.y, beat->five.dir);
                  M->freeIndex++;
              }
              if(beat->six.id.value() < 8){
                  M->ratIs(Rat(beat->six.id, beat->six.x, beat->six.y, beat->six.dir, beat->six.score, beat->six.name), RatIndexType(M->getFreeIndex()));
                  M->indexToId[M->getFreeIndex()] = beat->six.id.value();
+                                  SetRatPosition(RatIndexType (M->getFreeIndex()), beat->six.x, beat->six.y, beat->six.dir);
                  M->freeIndex++;
              }
              if(beat->seven.id.value() < 8){
                  M->ratIs(Rat(beat->seven.id, beat->seven.x, beat->seven.y, beat->seven.dir, beat->seven.score, beat->seven.name), RatIndexType(M->getFreeIndex()));
                  M->indexToId[M->getFreeIndex()] = beat->seven.id.value();
+                                  SetRatPosition(RatIndexType (M->getFreeIndex()), beat->seven.x, beat->seven.y, beat->seven.dir);
                  M->freeIndex++;
              }
              if(beat->eight.id.value() < 8){
                  M->ratIs(Rat(beat->eight.id, beat->eight.x, beat->eight.y, beat->eight.dir, beat->eight.score, beat->eight.name), RatIndexType(M->getFreeIndex()));
                  M->indexToId[M->getFreeIndex()] = beat->eight.id.value();
+                                  SetRatPosition(RatIndexType (M->getFreeIndex()), beat->eight.x, beat->eight.y, beat->eight.dir);
                  M->freeIndex++;
              }
              
@@ -740,7 +883,7 @@ void processPacket (MWEvent *eventPacket)
      }
     
      
-    
+//    updateView = TRUE; 
 
 }
 
